@@ -184,7 +184,7 @@ python3 -m pytest -q     # 8 tests
 
 ## License
 
-Personal project. See repository for terms.
+[MIT](LICENSE) © 2026 GamerGodASN
 
 ## Acknowledgments
 
