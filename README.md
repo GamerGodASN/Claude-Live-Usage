@@ -4,12 +4,13 @@ Live Claude Code token/cost usage rendered **in the terminal itself**, via Claud
 Code's `statusLine` hook — plus a terminal CLI and a browser dashboard.
 
 ```
-● Opus 4.7 (1M) │ ses $0.42 │ today 9.9M $10.02 │ 5h 23% ↻2h13m │ wk 41% ↻3d4h │ Projects
+● Opus 4.7 (1M) │ ses $0.42 │ today 9.9M $10.02 │ ctx 70K 7% │ 5h 23% ↻2h13m │ wk 41% ↻3d4h │ Projects
 ```
 
 The status line updates live while you work: current model, this-session cost,
-today's tokens + cost, your **5-hour session** and **7-day (weekly) rate-limit**
-usage with reset ETAs, and the active project name.
+today's tokens + cost, the **live context-window fill** (so you can see when to
+`/compact` or start fresh), your **5-hour session** and **7-day (weekly)
+rate-limit** usage with reset ETAs, and the active project name.
 
 Inspired by [phuryn/claude-usage](https://github.com/phuryn/claude-usage); the new
 part here is the live status-line integration so usage updates as you work.
@@ -22,6 +23,9 @@ part here is the live status-line integration so usage updates as you work.
 - **Rate-limit aware** — surfaces Pro/Max 5-hour and weekly limit percentages with
   colour (green/yellow/red) and time-until-reset, as soon as Claude Code reports
   them.
+- **Context-window aware** — shows the live context fill (tokens + % full) against
+  the real window size Claude Code reports (200K, or 1M on the `[1m]` beta), so you
+  can plan a `/compact` or a fresh session before you run out of room.
 - **Incremental & cheap** — only new bytes of changed transcripts are parsed, so
   running on every conversation update stays fast.
 - **Self-contained** — its own DB at `data/usage.db`; never touches
@@ -34,17 +38,19 @@ part here is the live status-line integration so usage updates as you work.
 Claude Code runs the configured `statusLine.command` on every conversation update
 and pipes session JSON on stdin. `statusline.py`:
 
-1. Reads that JSON (model, workspace, session id, `cost.total_cost_usd`, and
-   `rate_limits`).
+1. Reads that JSON (model, workspace, session id, `cost.total_cost_usd`,
+   `context_window`, and `rate_limits`).
 2. Runs a cheap **incremental** scan of `~/.claude/projects/*.jsonl` (only new
    bytes of changed files, resuming by byte offset).
-3. Prints one line: model · this-session cost · today's tokens + cost · 5h limit ·
-   weekly limit · project.
+3. Prints one line: model · this-session cost · today's tokens + cost · context
+   fill · 5h limit · weekly limit · project.
 
 Session cost prefers Claude Code's own `cost.total_cost_usd` when present, falling
-back to the value computed from the DB. Rate-limit segments only appear once Claude
-Code has reported them (i.e. after the first API response of a session) — which is
-why they "pop in" shortly after you send your first message.
+back to the value computed from the DB. The context-window and rate-limit segments
+come straight from Claude Code's stdin, so they only appear once it has reported
+them (i.e. after the first API response of a session) — which is why they "pop in"
+shortly after you send your first message, and the context segment briefly drops
+out again right after a `/compact`.
 
 ### Status-line anatomy
 
@@ -53,6 +59,7 @@ why they "pop in" shortly after you send your first message.
 | `● model` | `model.display_name` / `id` | `● Opus 4.7 (1M)` |
 | `ses $` | stdin `cost.total_cost_usd`, else DB by session | `ses $0.42` |
 | `today <tok> $` | DB totals for local date | `today 9.9M $10.02` |
+| `ctx <tok> <pct>` | stdin `context_window` (`total_input_tokens` / `used_percentage`) | `ctx 70K 7%` |
 | `5h <pct> ↻<eta>` | stdin `rate_limits.five_hour` | `5h 23% ↻2h13m` |
 | `wk <pct> ↻<eta>` | stdin `rate_limits.seven_day` | `wk 41% ↻3d4h` |
 | `project` | workspace dir basename | `Projects` |

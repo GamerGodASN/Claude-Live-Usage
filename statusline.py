@@ -75,6 +75,21 @@ def limit_seg(label: str, window: dict | None) -> str | None:
     return f"{GREY}{label}{RESET} {pct_color(p)}{p:.0f}%{RESET}{eta_s}"
 
 
+def ctx_seg(cw: dict | None) -> str | None:
+    """Live context-window fill: 'ctx 70K 7%', coloured as it approaches full.
+
+    Sourced from Claude Code's own context_window object, so the percentage is
+    measured against the real window size (200K, or 1M on the [1m] beta). None
+    when absent — it's null before the first API response and just after /compact.
+    """
+    cw = cw or {}
+    p = cw.get("used_percentage")
+    if p is None:
+        return None
+    tok = humanize_tokens(int(cw.get("total_input_tokens", 0) or 0))
+    return f"{GREY}ctx{RESET} {CYAN}{tok}{RESET} {pct_color(p)}{p:.0f}%{RESET}"
+
+
 def _read_stdin() -> dict:
     try:
         raw = sys.stdin.read()
@@ -110,6 +125,7 @@ def build_line(data: dict) -> str:
     # Subscription rate limits (Pro/Max): present only after the first API
     # response, so guard everything — missing windows just drop out.
     rl = data.get("rate_limits") or {}
+    cw = data.get("context_window") or {}
 
     parts = [
         f"{ORANGE}●{RESET} {BOLD}{model_name}{RESET}",
@@ -117,6 +133,7 @@ def build_line(data: dict) -> str:
         f"{GREY}today{RESET} {CYAN}{humanize_tokens(today['tokens'])}{RESET} {GREEN}{money(today['cost'])}{RESET}",
     ]
     for seg in (
+        ctx_seg(cw),                            # live context-window fill
         limit_seg("5h", rl.get("five_hour")),   # session window + next reset
         limit_seg("wk", rl.get("seven_day")),   # 7-day (weekly) limit
     ):

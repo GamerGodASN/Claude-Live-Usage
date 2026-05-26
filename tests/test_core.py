@@ -115,3 +115,43 @@ def test_build_line_uses_stdin_cost(conn, monkeypatch):
     assert "Opus 4.7" in line
     assert "$3.50" in line
     assert "Demo" in line
+
+
+# ---- context-window segment ----
+
+def _strip_ansi(s: str) -> str:
+    import re
+    return re.sub(r"\033\[[0-9;]*m", "", s)
+
+
+def test_ctx_seg_formats_tokens_and_pct():
+    seg = statusline.ctx_seg({"total_input_tokens": 70084, "used_percentage": 7})
+    assert seg is not None
+    assert _strip_ansi(seg) == "ctx 70.1K 7%"
+
+
+def test_ctx_seg_absent_when_no_data():
+    # null before first API response / right after /compact -> drops out
+    assert statusline.ctx_seg(None) is None
+    assert statusline.ctx_seg({}) is None
+    assert statusline.ctx_seg({"total_input_tokens": 0}) is None  # no used_percentage
+
+
+def test_build_line_includes_context_window(conn, monkeypatch):
+    monkeypatch.setattr(scanner, "scan", lambda **k: 0)
+    line = _strip_ansi(statusline.build_line({
+        "model": {"display_name": "Opus 4.7 (1M context)"},
+        "session_id": "sess-1",
+        "context_window": {"total_input_tokens": 70084,
+                           "context_window_size": 1_000_000, "used_percentage": 7},
+    }))
+    assert "ctx 70.1K 7%" in line
+
+
+def test_build_line_omits_context_window_when_absent(conn, monkeypatch):
+    monkeypatch.setattr(scanner, "scan", lambda **k: 0)
+    line = _strip_ansi(statusline.build_line({
+        "model": {"display_name": "Opus 4.7"},
+        "session_id": "sess-1",
+    }))
+    assert "ctx" not in line
