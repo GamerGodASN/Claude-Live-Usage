@@ -1,4 +1,4 @@
-# Claude Live Usage — Terminal Plugin
+# Claude Live Usage
 
 Live Claude Code token/cost usage rendered **in the terminal itself**, via Claude
 Code's `statusLine` hook — plus a terminal CLI and a browser dashboard.
