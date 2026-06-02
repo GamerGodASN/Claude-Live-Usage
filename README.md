@@ -173,7 +173,7 @@ default.
 ## Tests
 
 ```bash
-python3 -m pytest -q     # 8 tests
+python3 -m pytest -q     # 12 tests
 ```
 
 ## Troubleshooting
